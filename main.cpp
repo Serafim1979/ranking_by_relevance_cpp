@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <algorithm>
 
 using namespace std;
 
@@ -91,52 +92,105 @@ int MatchDocument(const pair<int, vector<string>>& content, const set<string>& q
 }
 
 // Для каждого документа возвращает его id и релевантность
-vector<pair<int, int>> FindDocuments(const vector<pair<int, vector<string>>>& documents,
-    const set<string>& stop_words, const string& query) {
+vector<pair<int, int>> FindDocuments(const vector<pair<int, vector<string>>>& documents, const set<string>& stop_words, const string& query) 
+{
     const set<string> query_words = ParseQuery(query, stop_words);
+
     vector<pair<int, int>> matched_documents;
-    for (const auto& document : documents) {
+
+    for (const auto& document : documents) 
+    {
         const int relevance = MatchDocument(document, query_words);
-        if (relevance > 0) {
+
+        if (relevance > 0) 
+        {
             matched_documents.push_back({ document.first, relevance });
         }
     }
+
     return matched_documents;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Для каждого документа возвращает его релевантность и id
-vector<pair<int, int>> FindAllDocuments(const vector<pair<int, vector<string>>>& documents,
-    const set<string>& query_words)
+vector<pair<int, int>> FindAllDocuments(const vector<pair<int, vector<string>>>& documents, const set<string>& query_words)
 {
     // Превратите функцию FindDocuments в FindAllDocuments
     // Первым элементом возвращаемых пар идёт релевантность документа, а вторым - его id
+    // 
+    // const set<string> query_words = ParseQuery(query, stop_words); я так понял что здесь это уже не нужно
+
+    vector<pair<int, int>> matched_documents;
+    for (const auto& document : documents) 
+    {
+        const int relevance = MatchDocument(document, query_words);
+
+        if (relevance > 0) 
+        {
+            matched_documents.push_back({ relevance, document.first });
+        }
+    }
+
+    sort(matched_documents.begin(), matched_documents.end());
+
+    return matched_documents;
+}
+
+//1. Вызываем `FindAllDocuments` и получаем все документы, которые были найдены по нашему запросу. (Стоп - слова игнорируются как это было раньше).
+//Вектор будет не отсортирован и в нём буду все - все документы.
+//
+//2. Сортируем полученные документы.Вектор отсортирован в порядке возрастания, но в нём все документы.
+//
+//3. Переворачиваем вектор, так как сортировка делает это в порядке возрастания, тем самым документы с меньшей релевантностью будут первыми.
+//Нам нужно наоборот.Теперь вектор отсортирован в порядке убывания, но в нём всё ещё все документы.
+//
+//4. Нужно убрать все документы кроме первых 5 самый релевантных.
+
+vector<pair<int, int>> FindTopDocuments(const vector<pair<int, vector<string>>>& documents, const set<string>& stop_words, const string& raw_query) 
+{
+    // Напишите функцию, используя FindAllDocuments ()
+    const set<string> query_words = ParseQuery(raw_query, stop_words);
+    vector<pair<int, int>> matched_documents = FindAllDocuments(documents, query_words);
+
+    sort(matched_documents.begin(), matched_documents.end());
+
+    reverse(matched_documents.begin(), matched_documents.end());
+
+    if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) 
+    {
+        matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+    }
+
+    for (auto& [relevance, document_id] : matched_documents)
+    {
+        swap(relevance, document_id);
+    }
+
+    return matched_documents;
 }
 
 
 
-// Возвращает топ-5 самых релевантных документов в виде пар: {id, релевантность}
-vector<pair<int, int>> FindTopDocuments(const vector<pair<int, vector<string>>>& documents,
-    const set<string>& stop_words, const string& raw_query) {
-    // Напишите функцию, используя FindAllDocuments
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-int main() {
+int main() 
+{
     const string stop_words_joined = ReadLine();
     const set<string> stop_words = ParseStopWords(stop_words_joined);
 
     // Read documents
     vector<pair<int, vector<string>>> documents;
+
     const int document_count = ReadLineWithNumber();
-    for (int document_id = 0; document_id < document_count; ++document_id) {
+
+    for (int document_id = 0; document_id < document_count; ++document_id) 
+    {
         AddDocument(documents, stop_words, document_id, ReadLine());
     }
 
     const string query = ReadLine();
+
     // Вместо FindDocuments используйте FindTopDocuments
-    for (auto [document_id, relevance] : FindDocuments(documents, stop_words, query)) {
-        cout << "{ document_id = "s << document_id << ", relevance = "s << relevance << " }"s
-            << endl;
+    for (auto [document_id, relevance] : FindTopDocuments(documents, stop_words, query)) 
+    {
+        cout << "{ document_id = "s << document_id << ", relevance = "s << relevance << " }"s << endl;
     }
 }
